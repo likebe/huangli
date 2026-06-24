@@ -73,6 +73,14 @@ input:focus,select:focus{outline:none;border-color:var(--gold);}
 .cell .yi1{font-size:12px;color:#21683f;background:#e9f5ee;border:1px solid #cce6d6;border-radius:6px;padding:0 6px;margin-top:auto;align-self:flex-start;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 .cell .dot{position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;}
 .dot.hd-good{background:var(--good);} .dot.hd-bad{background:var(--bad);}
+/* 值日吉凶着色 (值神+建除 综合) */
+.cell.luck-vgood{background:#eef7f0;border-color:#cfe6d6;}
+.cell.luck-good{background:#f5faf6;border-color:#dcebe0;}
+.cell.luck-mid{background:#fdf7ec;}
+.cell.luck-bad{background:#fbf1ef;border-color:#ecd2cd;}
+.cell .lvl{position:absolute;top:7px;right:7px;font-size:11px;line-height:1.55;padding:0 6px;border-radius:7px;color:#fff;font-weight:700;letter-spacing:.5px;}
+.luck-vgood .lvl{background:#1f7a3d;} .luck-good .lvl{background:#4a9b6c;} .luck-mid .lvl{background:#c39a33;} .luck-bad .lvl{background:#bb3a32;}
+.cell.sel .lvl{box-shadow:0 0 0 2px #fff;}
 .cell .todaymark{position:absolute;bottom:4px;right:6px;font-size:9px;color:#fff;background:var(--red);border-radius:6px;padding:0 4px;}
 @media(max-width:560px){.cell{min-height:72px;padding:5px 6px;} .cell .gz3,.cell .yi1{display:none;} .cell .sol{font-size:17px;}}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:10px;}
@@ -229,10 +237,12 @@ input:focus,select:focus{outline:none;border-color:var(--gold);}
           <div class="weekrow" id="weekRow"></div>
           <div class="daysgrid" id="daysGrid"></div>
           <div class="legend">
-            <span><i style="background:var(--good)"></i>黄道吉日</span>
-            <span><i style="background:var(--bad)"></i>黑道凶日</span>
-            <span><i style="background:var(--jade)"></i>节气</span>
-            <span><i style="background:var(--red)"></i>农历节日</span>
+            <b style="color:var(--ink)">按当日值日吉凶着色：</b>
+            <span><i style="background:#1f7a3d"></i>大吉</span>
+            <span><i style="background:#4a9b6c"></i>吉</span>
+            <span><i style="background:#c39a33"></i>平</span>
+            <span><i style="background:#bb3a32"></i>凶</span>
+            <span style="color:var(--ink2)">｜角标为值日评级，格内显示干支·值神</span>
           </div>
         </div>
       <aside class="card" id="detailCard">
@@ -1019,6 +1029,37 @@ function solarFestival(m,d){
   return map[m+'-'+d]||'';
 }
 
+/* ================= 值日吉凶评级 + 今日总评 ================= */
+var ZS_MEAN={'青龙':'主吉庆、贵人扶助','明堂':'主光明、得贵人','天刑':'主刑伤、官非口舌','朱雀':'主口舌、是非纠纷','金匮':'主财富、婚喜','天德':'主福德、逢凶化吉','白虎':'主伤灾、血光','玉堂':'主贵人、文书喜事','天牢':'主拘束、阻滞','玄武':'主盗失、暗昧不明','司命':'主衣食、福气','勾陈':'主牵连、拖延反复'};
+var JC_MEAN={'建':'万物始建、健旺','除':'除旧布新、扫除','满':'圆满丰收','平':'平稳普通','定':'安定稳固','执':'执守持成','破':'冲破耗散、诸事多阻','危':'危高、宜谨慎','成':'成就圆满、百事可为','收':'收纳归藏','开':'开放通达','闭':'闭藏收口'};
+function dayLuck(info){
+  var jcL=info.jianchu.level;
+  var jcScore=(jcL==='大吉')?2:((jcL==='吉')?1:((jcL==='凶')?-1:0));
+  var score=(info.zhishen.huangdao?1:-1)+jcScore;
+  if(score>=2)return {level:'大吉',cls:'vgood',score:score};
+  if(score===1)return {level:'吉',cls:'good',score:score};
+  if(score===0)return {level:'平',cls:'mid',score:score};
+  return {level:'凶',cls:'bad',score:score};
+}
+function dayNarrative(info){
+  var lk=dayLuck(info), zs=info.zhishen.name, hd=info.zhishen.huangdao, jc=info.jianchu.name;
+  var overall={'大吉':'是个相当不错的好日子，办事较为顺遂，可放心安排重要事务','吉':'整体偏吉，适合按计划推进想做的事','平':'吉凶参半、比较平常——日常照旧，真正的大事可再斟酌或另择吉日','凶':'值日偏弱，今天办大事容易受阻，建议从简、低调，或改到更好的日子'}[lk.level];
+  var yi=info.yi.slice(0,5).join('、')||'无特别推荐';
+  var ji=info.ji.slice(0,5).join('、')||'无特别禁忌';
+  var chongSX=SX_FULL[(info.gz.dayZhi+6)%12];
+  var gh=info.hours.filter(function(h){return h.luck==='吉';}).slice(0,4).map(function(h){return h.zhi+'时';}).join('、');
+  var col=(lk.cls==='bad')?'var(--bad)':((lk.cls==='mid')?'var(--mid)':'var(--good)');
+  var t='今天由'+term('值神','值神')+'「'+zs+'」当值，它是'+(hd?'六黄道吉神之一':'六黑道凶神之一')+'（'+(ZS_MEAN[zs]||'')+'）；'
+    +term('建除','值日')+'轮到「'+jc+'日」（'+(JC_MEAN[jc]||'')+'）。两者综合来看，今天'+overall+'。';
+  t+='<br><br>通俗讲：今天比较<b style="color:var(--good)">适合</b> '+yi+' 这类事；<b style="color:var(--bad)">不太适合</b> '+ji+'。';
+  t+='<br><br>属<b>'+chongSX+'</b>的朋友今天'+term('冲煞','受冲')+'，办大事宜避让或请人代办；当日'+term('煞','煞方')+'为<b>'+info.chongsha.sha+'方</b>，不宜朝该方向动土、远行。';
+  if(gh) t+='<br><br>若要办要紧事，可挑当天的'+term('时辰','吉时')+'：<b>'+gh+'</b>（避开与自己生肖相冲的时辰更稳妥）。';
+  return '<div class="sec-h">今日吉凶总评<span class="tip">通俗解读</span></div>'
+    +'<div class="analysis"><div style="font-weight:700;font-size:17px;margin-bottom:8px;color:'+col+'">综合评级：'+lk.level
+    +'　<span style="font-size:13px;color:var(--ink2);font-weight:400">（值神'+zs+(hd?'·黄道':'·黑道')+' ＋ '+jc+'日）</span></div>'
+    +t+'<br><span style="font-size:12.5px;color:var(--ink2)">＊以上为依据值神、建除等传统规则的通俗解读，仅供文化参考，不作决策依据。</span></div>';
+}
+
 /* ================= 状态 ================= */
 var state={ calY:0, calM:0, sel:null };
 var today=new Date();
@@ -1051,13 +1092,13 @@ function renderCalendar(){
     else lunTxt=LDAY[lu.lDay];
     var isToday=(y===today.getFullYear()&&m===today.getMonth()+1&&d===today.getDate());
     var isSel=(state.sel&&y===state.sel.y&&m===state.sel.m&&d===state.sel.d);
-    var dotCls=info.zhishen.huangdao?'hd-good':'hd-bad';
+    var lk=dayLuck(info);
     var yi1=(info.yi&&info.yi.length)?info.yi[0]:'';
-    h+='<div class="cell'+(oth?' oth':'')+(isToday?' today':'')+(isSel?' sel':'')+'" data-d="'+y+'-'+m+'-'+d+'">'
-      +'<span class="dot '+dotCls+'"></span>'
+    h+='<div class="cell luck-'+lk.cls+(oth?' oth':'')+(isToday?' today':'')+(isSel?' sel':'')+'" data-d="'+y+'-'+m+'-'+d+'">'
+      +'<span class="lvl">'+lk.level+'</span>'
       +'<span class="sol">'+d+'</span>'
       +'<span class="'+cls+'">'+lunTxt+'</span>'
-      +'<span class="gz3">'+info.gz.day+'日·'+info.jianchu.name+'</span>'
+      +'<span class="gz3">'+info.gz.day+'·'+info.zhishen.name+'</span>'
       +(yi1?'<span class="yi1">宜 '+yi1+'</span>':'')
       +(isToday?'<span class="todaymark">今</span>':'')
       +'</div>';
@@ -1128,7 +1169,8 @@ function renderDetail(y,m,d){
     +dirCard('阳贵神',i.pos.yangGui)+dirCard('阴贵神',i.pos.yinGui)
   +'</div>'
   +'<div class="sec-h">'+term('时辰','时辰')+'吉凶<span class="tip">绿吉 · 红凶</span></div>'
-  +'<div class="hours">'+hoursHtml+'</div>';
+  +'<div class="hours">'+hoursHtml+'</div>'
+  + dayNarrative(i);
 
   $('detailBody').innerHTML=html;
 }
